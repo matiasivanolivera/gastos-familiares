@@ -197,7 +197,7 @@ const catBkdn= arr => Object.entries(arr.reduce((a,e)=>{a[e.category]=(a[e.categ
 let EXP=[], INC={}, TAB='dash', MON=curM(), EDITID=null, FORM=mkBlank(), CF='', PF='';
 let CHARTS={}, SAVING=false;
 
-function mkBlank(){ return {description:'',category:'servicios',person:'FAMILIAR',amount:'',paymentMethod:'Crédito',monthDevengado:MON,fixed:false,notes:''}; }
+function mkBlank(){ return {description:'',category:'servicios',person:'FAMILIAR',payer:'MATI',amount:'',paymentMethod:'Crédito',monthDevengado:MON,fixed:false,notes:''}; }
 function mExp(){ return EXP.filter(e=>e.monthDevengado===MON); }
 function mInc(){ const i=INC[MON]; return i?(i.mati||0)+(i.andre||0):0; }
 function mReal(){
@@ -210,7 +210,7 @@ function allM(){ return [...new Set(EXP.map(e=>e.monthDevengado))].sort(); }
 function rowToExp(r){
   return { id:r.id, description:r.description, category:r.category, person:r.person,
     amount:Number(r.amount), paymentMethod:r.payment_method, monthDevengado:r.month_devengado,
-    fixed:r.fixed, notes:r.notes||'' };
+    fixed:r.fixed, notes:r.notes||'', payer:r.payer||'MATI' };
 }
 function expToRow(e){
   return { id:e.id, description:e.description, category:e.category, person:e.person,
@@ -435,11 +435,17 @@ function rAgregar(){
       </select>
     </div>
     <div>
-      <label>Persona</label>
-      <select id="fp" onchange="FORM.person=this.value">
-        ${PERSONS.map(p=>`<option value="${p}"${f.person===p?' selected':''}>${PLBL[p]}</option>`).join('')}
-      </select>
+      <label>Beneficiario (para quién)</label>
+    <select id="fp" onchange="FORM.person=this.value">
+      ${PERSONS.map(p=>`<option value="${p}"${f.person===p?' selected':''}>${PLBL[p]}</option>`).join('')}
+    </select>
     </div>
+  </div>
+  <div>
+    <label>Pagador (quién desembolsa)</label>
+    <select id="fpay2" onchange="FORM.payer=this.value">
+      ${['MATI','ANDRE'].map(p=>`<option value="${p}"${f.payer===p?' selected':''}>${PLBL[p]}</option>`).join('')}
+    </select>
   </div>
   <div class="grow2">
     <div>
