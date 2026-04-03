@@ -180,7 +180,7 @@ const CATS = {
 const PERSONS   = ['FAMILIAR','MATI','ANDRE','VALEN', 'EMMA', 'OLIVIA'];
 const PCLR      = { FAMILIAR:'#94a3b8', MATI:'#60a5fa', ANDRE:'#f472b6', VALEN:'#fbbf24', EMMA:'#a78bfa', OLIVIA:'#34d399' };
 const PLBL      = { FAMILIAR:'Familiar', MATI:'Mati', ANDRE:'Andre', VALEN:'Valentín', EMMA:'Emma', OLIVIA:'Olivia' };
-const PMTHS     = ['Débito Automático','Crédito','Débito','MercadoPago','NaranjaX','Efectivo'];
+let PMTHS     = [];
 const MES       = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 /* ===================== HELPERS ===================== */
@@ -200,6 +200,10 @@ let CHARTS={}, SAVING=false;
 function mkBlank(){ return {description:'',category:'servicios',person:'FAMILIAR',amount:'',paymentMethod:'Crédito',monthDevengado:MON,fixed:false,notes:''}; }
 function mExp(){ return EXP.filter(e=>e.monthDevengado===MON); }
 function mInc(){ const i=INC[MON]; return i?(i.mati||0)+(i.andre||0):0; }
+function mReal(){
+  const deferredNames = PMTHS.filter(p=>p.deferred).map(p=>p.name);
+  return mExp().filter(e=>!deferredNames.includes(e.paymentMethod)).reduce((s,e)=>s+e.amount,0);
+}
 function allM(){ return [...new Set(EXP.map(e=>e.monthDevengado))].sort(); }
 
 /* ===================== DB MAPPERS ===================== */
@@ -226,15 +230,18 @@ if(isConfigured){
 async function loadData(){
   if(!isConfigured){ showConfigWarning(); return; }
   try{
-    const [expRes, incRes] = await Promise.all([
+    const [expRes, incRes, pmRes] = await Promise.all([
       sb.from('expenses').select('*').order('month_devengado',{ascending:false}).order('amount',{ascending:false}),
-      sb.from('incomes').select('*')
+      sb.from('incomes').select('*'),
+      sb.from('payment_methods').select('*').order('name')
     ]);
     if(expRes.error) throw expRes.error;
     if(incRes.error) throw incRes.error;
+    if(pmRes.error) throw pmRes.error;
     EXP = (expRes.data||[]).map(rowToExp);
     INC = {};
     (incRes.data||[]).forEach(r => INC[r.month]={mati:Number(r.mati),andre:Number(r.andre)});
+    PMTHS = (pmRes.data||[]).map(r =>({id:r.id, name:r.name, deferred:r.deferred}));
     // Set MON to latest month with data, or current month
     const months = allM();
     if(months.length>0 && !months.includes(MON)) MON = months[months.length-1];
@@ -447,7 +454,7 @@ function rAgregar(){
   <div>
     <label>Medio de pago</label>
     <select id="fpay" onchange="FORM.paymentMethod=this.value">
-      ${PMTHS.map(m=>`<option value="${m}"${f.paymentMethod===m?' selected':''}>${m}</option>`).join('')}
+      ${PMTHS.map(m=>`<option value="${m.name}"${f.paymentMethod===m.name?' selected':''}>${m.name}</option>`).join('')}
     </select>
   </div>
   <div class="trow">
