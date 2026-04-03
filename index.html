@@ -215,7 +215,7 @@ function rowToExp(r){
 function expToRow(e){
   return { id:e.id, description:e.description, category:e.category, person:e.person,
     amount:e.amount, payment_method:e.paymentMethod, month_devengado:e.monthDevengado,
-    fixed:e.fixed, notes:e.notes||'' };
+    fixed:e.fixed, notes:e.notes||'', payer:e.payer||'MATI' };
 }
 
 /* ===================== SUPABASE INIT ===================== */
@@ -502,6 +502,29 @@ function rAnalisis(){
 <div style="display:flex;gap:14px;margin-bottom:16px;font-size:11px;color:var(--text2)">
   <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:2px;background:rgba(59,130,246,.8)"></span>Gastos</span>
   <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:2px;background:rgba(16,185,129,.4)"></span>Ingresos</span>
+</div>
+
+<div class="stitle">Impacto por pagador — ${fmtM(MON)}</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+  ${['MATI','ANDRE'].map(p=>{
+    const inc=(INC[MON]?.[p.toLowerCase()])||0;
+    const deferredNames=PMTHS.filter(x=>x.deferred).map(x=>x.name);
+    const pagado=sumAmt(mExp().filter(e=>e.payer===p&&!deferredNames.includes(e.paymentMethod)));
+    const comprometido=sumAmt(mExp().filter(e=>e.payer===p&&deferredNames.includes(e.paymentMethod)));
+    const disponible=inc-pagado;
+    const pct=inc>0?Math.round(pagado/inc*100):0;
+    return`<div style="background:var(--bg2);border-radius:var(--r);padding:14px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:12px">
+        <span style="width:10px;height:10px;border-radius:50%;background:${PCLR[p]}"></span>
+        <span style="font-size:13px;font-weight:600">${PLBL[p]}</span>
+      </div>
+      <div class="srow"><span style="font-size:12px;color:var(--text2)">Ingreso</span><span style="font-size:12px;font-variant-numeric:tabular-nums;font-weight:500">${$$(inc)}</span></div>
+      <div class="srow"><span style="font-size:12px;color:var(--text2)">Pagado</span><span style="font-size:12px;font-variant-numeric:tabular-nums;color:#ef4444">${$$(pagado)}</span></div>
+      <div class="srow"><span style="font-size:12px;color:var(--text2)">Disponible</span><span style="font-size:12px;font-variant-numeric:tabular-nums;color:${disponible<0?'#ef4444':'#10b981'}">${$$(disponible)}</span></div>
+      <div class="srow" style="border:none"><span style="font-size:12px;color:var(--text2)">Comprometido</span><span style="font-size:12px;font-variant-numeric:tabular-nums;color:#f59e0b">${$$(comprometido)}</span></div>
+      <div class="pbar" style="margin-top:8px"><div class="pfill" style="width:${Math.min(pct,100)}%;background:${pctClr(pct)}"></div></div>
+    </div>`;
+  }).join('')}
 </div>
 
 <div class="stitle">Fijo vs Variable — ${fmtM(MON)}</div>
