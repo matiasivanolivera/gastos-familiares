@@ -166,17 +166,7 @@ const SUPABASE_URL      = 'https://mpwnrcuvenrmzihekbio.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wd25yY3V2ZW5ybXppaGVrYmlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTE5MzAsImV4cCI6MjA5MDcyNzkzMH0.-0ZuLnxMLCtqwmL2nOXbwiPzjxulGltbuSt8pS83BRk';
 
 /* ===================== CONSTANTES ===================== */
-const CATS = {
-  servicios:      { l:'Servicios Hogar',   c:'#3b82f6' },
-  seguros:        { l:'Seguros',           c:'#8b5cf6' },
-  vehiculos:      { l:'Vehículos',         c:'#64748b' },
-  conectividad:   { l:'Conectividad',      c:'#06b6d4' },
-  educacion:      { l:'Educación',         c:'#10b981' },
-  entretenimiento:{ l:'Entretenimiento',   c:'#f59e0b' },
-  deuda:          { l:'Deuda / Cuotas',    c:'#ef4444' },
-  supermercado:   { l:'Supermercado',      c:'#84cc16' },
-  extras:         { l:'Extras',            c:'#6b7280' },
-};
+let CATS = {};
 const PERSONS   = ['FAMILIAR','MATI','ANDRE','VALEN', 'EMMA', 'OLIVIA'];
 const PCLR      = { FAMILIAR:'#94a3b8', MATI:'#60a5fa', ANDRE:'#f472b6', VALEN:'#fbbf24', EMMA:'#a78bfa', OLIVIA:'#34d399' };
 const PLBL      = { FAMILIAR:'Familiar', MATI:'Mati', ANDRE:'Andre', VALEN:'Valentín', EMMA:'Emma', OLIVIA:'Olivia' };
@@ -191,7 +181,7 @@ const curM  = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.
 const sumAmt= arr => arr.reduce((s,e)=>s+e.amount,0);
 const pctClr= p => p>=100?'#ef4444':p>=85?'#f59e0b':'#10b981';
 const catBkdn= arr => Object.entries(arr.reduce((a,e)=>{a[e.category]=(a[e.category]||0)+e.amount;return a;},{}))
-  .map(([k,v])=>({k,l:CATS[k]?.l||k,v,c:CATS[k]?.c||'#888'})).sort((a,b)=>b.v-a.v);
+  .map(([k,v])=>({k,l:CATS[k]?.l||k,v,c:CATS[k]?.c||'#6b7280'})).sort((a,b)=>b.v-a.v);
 
 /* ===================== STATE ===================== */
 let EXP=[], INC={}, TAB='dash', MON=curM(), EDITID=null, FORM=mkBlank(), CF='', PF='';
@@ -230,10 +220,11 @@ if(isConfigured){
 async function loadData(){
   if(!isConfigured){ showConfigWarning(); return; }
   try{
-    const [expRes, incRes, pmRes] = await Promise.all([
+    const [expRes, incRes, pmRes, catRes] = await Promise.all([
       sb.from('expenses').select('*').order('month_devengado',{ascending:false}).order('amount',{ascending:false}),
       sb.from('incomes').select('*'),
-      sb.from('payment_methods').select('*').order('name')
+      sb.from('payment_methods').select('*').order('name'),
+      sb.from('categories').select('*').order('name')
     ]);
     if(expRes.error) throw expRes.error;
     if(incRes.error) throw incRes.error;
@@ -242,6 +233,7 @@ async function loadData(){
     INC = {};
     (incRes.data||[]).forEach(r => INC[r.month]={mati:Number(r.mati),andre:Number(r.andre)});
     PMTHS = (pmRes.data||[]).map(r =>({id:r.id, name:r.name, deferred:r.deferred}));
+    CATS = Object.fromEntries((catRes.data||[]).map(r=>[r.id,{l:r.name, c:r.color, icon:r.icon}]));
     // Set MON to latest month with data, or current month
     const months = allM();
     if(months.length>0 && !months.includes(MON)) MON = months[months.length-1];
