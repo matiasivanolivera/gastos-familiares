@@ -1285,6 +1285,71 @@ ${pendientes.length === 0
       }
     }
 
+    async function procesarComprobante(input) {
+      try {
+        const archivo = input.files[0];
+        if (!archivo) { return; }
+
+        closeModal();
+        TAB = 'pendientes';
+        document.getElementById('contentSlot').innerHTML = `
+    <div class="loader">
+      <div class="spinner"></div>
+      Analizando comprobante...
+    </div>`;
+
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = () => reject(new Error('Error leyendo archivo'));
+          reader.readAsDataURL(archivo);
+        });
+
+        const esPDF = archivo.type === 'application/pdf';
+        const mediaType = esPDF ? 'application/pdf' : archivo.type;
+
+        const response = await fetch(
+          'https://mpwnrcuvenrmzihekbio.supabase.co/functions/v1/parsear-comprobante',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagen: base64, tipo: mediaType })
+          }
+        )
+
+        const data = await response.json();
+        const texto = data.texto ?? '';
+
+        let campos = {};
+        try { campos = JSON.parse(texto); }
+        catch { campos = {}; }
+
+        const borrador = {
+          id: uid(),
+          description: campos.emisor || campos.descripcion || '',
+          category: 'extras',
+          person: 'FAMILIAR',
+          payer: 'MATI',
+          amount: campos.monto || 0,
+          paymentMethod: 'Crédito',
+          monthDevengado: campos.fecha
+            ? campos.fecha.slice(0, 7)
+            : MON,
+          fixed: false,
+          notes: campos.descripcion || '',
+          status: 'borrador'
+        };
+
+        await saveExpense(borrador);
+        EXP = [...EXP, borrador];
+        render();
+        toast('Comprobante capturado — revisá en Pendientes');
+      } catch (err) {
+        toast('Error al procesar: ' + err.message);
+        render();
+      }
+    }
+
     function showCapturaModal() {
       document.getElementById('modalBox').innerHTML = `
 <div style="font-size:15px;font-weight:600;margin-bottom:4px">Capturar comprobante</div>
