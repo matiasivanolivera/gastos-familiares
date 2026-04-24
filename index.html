@@ -693,6 +693,8 @@
         <span class="mlabel" id="mLabel"></span>
         <button class="mbtn" id="nextBtn" onclick="navM(1)">&#8250;</button>
       </div>
+      <button class="inc-btn" onclick="showCapturaModal()"
+        style="background:var(--green);color:#fff;border-color:var(--green)">📷 Capturar</button>
       <button class="inc-btn" onclick="showIncModal()">Ingresos</button>
     </div>
     <div class="tabs" id="tabsSlot"></div>
@@ -742,7 +744,7 @@
     let EXP = [], INC = {}, TAB = 'dash', MON = curM(), EDITID = null, FORM = mkBlank(), CF = '', PF = '';
     let CHARTS = {}, SAVING = false;
 
-    function mkBlank() { return { description: '', category: 'servicios', person: 'FAMILIAR', payer: 'MATI', amount: '', paymentMethod: 'Crédito', monthDevengado: MON, fixed: false, notes: '' }; }
+    function mkBlank() { return { description: '', category: 'servicios', person: 'FAMILIAR', payer: 'MATI', amount: '', paymentMethod: 'Crédito', monthDevengado: MON, fixed: false, notes: '', status: 'confirmado' }; }
     function mExp() { return EXP.filter(e => e.monthDevengado === MON); }
     function mInc() { const i = INC[MON]; return i ? (i.mati || 0) + (i.andre || 0) : 0; }
     function mReal() {
@@ -756,14 +758,14 @@
       return {
         id: r.id, description: r.description, category: r.category, person: r.person,
         amount: Number(r.amount), paymentMethod: r.payment_method, monthDevengado: r.month_devengado,
-        fixed: r.fixed, notes: r.notes || '', payer: r.payer || 'MATI'
+        fixed: r.fixed, notes: r.notes || '', payer: r.payer || 'MATI', status: r.status || 'confirmado'
       };
     }
     function expToRow(e) {
       return {
         id: e.id, description: e.description, category: e.category, person: e.person,
         amount: e.amount, payment_method: e.paymentMethod, month_devengado: e.monthDevengado,
-        fixed: e.fixed, notes: e.notes || '', payer: e.payer || 'MATI'
+        fixed: e.fixed, notes: e.notes || '', payer: e.payer || 'MATI', status: e.status || 'confirmado'
       };
     }
 
@@ -866,7 +868,7 @@
       document.getElementById('prevBtn').disabled = idx <= 0;
       document.getElementById('nextBtn').disabled = idx >= months.length - 1 || (months.length === 0);
 
-      const tbls = [{ id: 'dash', l: 'Resumen' }, { id: 'gastos', l: 'Gastos' }, { id: 'agregar', l: '+ Agregar' }, { id: 'analisis', l: 'Análisis' }];
+      const tbls = [{ id: 'dash', l: 'Resumen' }, { id: 'gastos', l: 'Gastos' }, { id: 'pendientes', l: '⏳ Pendientes' }, { id: 'agregar', l: '+ Agregar' }, { id: 'analisis', l: 'Análisis' }];
       document.getElementById('tabsSlot').innerHTML = tbls.map(t =>
         `<div class="tab${TAB === t.id ? ' on' : ''}" onclick="setTab('${t.id}')">${t.l}</div>`).join('');
 
@@ -874,6 +876,7 @@
       if (TAB === 'gastos') rGastos();
       if (TAB === 'agregar') rAgregar();
       if (TAB === 'analisis') rAnalisis();
+      if (TAB === 'pendientes') rPendientes();
     }
 
     /* ===================== DASH ===================== */
@@ -1034,6 +1037,55 @@ ${exps.length > 8 ? `<div style="text-align:center;margin-top:10px;font-size:12p
 </div>`;
     }
 
+    function rPendientes() {
+      const pendientes = EXP.filter(e => e.status !== 'confirmado').sort((a, b) => b.amount - a.amount);
+      document.getElementById('contentSlot').innerHTML = `
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  <div style="font-size:13px;color:var(--text2)">${pendientes.length} gastos pendientes de revisión</div>
+</div>
+${pendientes.length === 0
+          ? `<div class="empty">No hay gastos pendientes — todo confirmado ✓</div>`
+          : `<div class="elist">
+    ${pendientes.map(e => {
+            const cat = CATS[e.category] || CATS.extras || { l: 'Extras', c: '#6b7280' };
+            const statusClr = e.status === 'borrador' ? '#f59e0b' : '#3b82f6';
+            const statusLbl = e.status === 'borrador' ? 'Borrador' : 'Pendiente';
+            return `<div class="eitem">
+        <div class="eico" style="background:${cat.c}1a;color:${cat.c}">${catIcon(e.category)}</div>
+        <div class="emain">
+          <div class="ename">${escH(e.description || 'Sin descripción')}</div>
+          <div class="emeta">
+            <span style="color:${statusClr};font-weight:500">${statusLbl}</span>
+            &middot; <span style="color:${PCLR[e.person]}">${PLBL[e.person] || e.person}</span>
+            &middot; ${e.paymentMethod || '—'}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="eamt">${$$(e.amount)}</div>
+          <div class="eacts" style="opacity:1;pointer-events:all">
+            <button class="abtn" onclick="doEdit('${e.id}')" title="Completar">✎</button>
+            <button class="abtn" onclick="confirmarGasto('${e.id}')" title="Confirmar" style="color:#10b981">✓</button>
+            <button class="abtn del" onclick="doDel('${e.id}')" title="Eliminar">✕</button>
+          </div>
+        </div>
+      </div>`;
+          }).join('')}
+  </div>`}`;
+    }
+
+    async function confirmarGasto(id) {
+      const e = EXP.find(x => x.id === id);
+      if (!e) return;
+      if (!e.description || !e.amount) { toast('Completá descripción y monto antes de confirmar'); return; }
+      try {
+        const exp = { ...e, status: 'confirmado' };
+        await saveExpense(exp);
+        EXP = EXP.map(x => x.id === id ? exp : x);
+        render();
+        toast('Gasto confirmado ✓');
+      } catch (err) { toast('Error: ' + err.message); }
+    }
+
     /* ===================== ANÁLISIS ===================== */
     function rAnalisis() {
       const exps = mExp(), tot = sumAmt(exps);
@@ -1162,7 +1214,7 @@ ${exps.length > 8 ? `<div style="text-align:center;margin-top:10px;font-size:12p
     }
 
     async function doSave() {
-      if(FORM.category==='__nueva__'){ showNuevaCatModal(); return; }
+      if (FORM.category === '__nueva__') { showNuevaCatModal(); return; }
       const f = FORM;
       if (!f.description.trim()) { toast('Completá la descripción'); return; }
       if (!f.amount || isNaN(+f.amount) || +f.amount <= 0) { toast('Ingresá un monto válido'); return; }
@@ -1184,8 +1236,8 @@ ${exps.length > 8 ? `<div style="text-align:center;margin-top:10px;font-size:12p
       }
     }
 
-function showNuevaCatModal(){
-  document.getElementById('modalBox').innerHTML=`
+    function showNuevaCatModal() {
+      document.getElementById('modalBox').innerHTML = `
 <div style="font-size:15px;font-weight:600;margin-bottom:4px">Nueva categoría</div>
 <div style="font-size:12px;color:var(--text2);margin-bottom:18px">Se agregará a todas las opciones</div>
 <div style="margin-bottom:12px">
@@ -1199,40 +1251,132 @@ function showNuevaCatModal(){
 <div style="margin-bottom:20px">
   <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:5px">Ícono base</label>
   <select id="cat-icon" style="width:100%">
-    ${Object.keys(CATS).map(k=>`<option value="${k}">${CATS[k].l}</option>`).join('')}
+    ${Object.keys(CATS).map(k => `<option value="${k}">${CATS[k].l}</option>`).join('')}
   </select>
 </div>
 <div style="display:flex;gap:8px">
   <button class="btn-s" style="flex:1" onclick="closeModal()">Cancelar</button>
   <button class="btn-p" style="flex:1" id="catSaveBtn" onclick="saveNuevaCat()">Agregar</button>
 </div>`;
-  document.getElementById('overlay').classList.add('open');
-  setTimeout(()=>document.getElementById('cat-name')?.focus(),100);
-}
+      document.getElementById('overlay').classList.add('open');
+      setTimeout(() => document.getElementById('cat-name')?.focus(), 100);
+    }
 
-async function saveNuevaCat(){
-  const name=document.getElementById('cat-name').value.trim();
-  const color=document.getElementById('cat-color').value;
-  const icon=document.getElementById('cat-icon').value;
-  if(!name){ toast('Completá el nombre'); return; }
-  const id=name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
-  const btn=document.getElementById('catSaveBtn');
-  btn.disabled=true; btn.textContent='Guardando…';
-  try{
-    const {error}=await sb.from('categories').insert({id,name,color,icon});
-    if(error) throw error;
-    CATS[id]={l:name,c:color,icon};
-    FORM.category=id;
-    closeModal();
-    TAB='agregar';
-    render();
-    toast('Categoría agregada ✓');
-  }catch(err){
-    btn.disabled=false; btn.textContent='Agregar';
-    toast('Error: '+err.message);
-  }
-}
+    async function saveNuevaCat() {
+      const name = document.getElementById('cat-name').value.trim();
+      const color = document.getElementById('cat-color').value;
+      const icon = document.getElementById('cat-icon').value;
+      if (!name) { toast('Completá el nombre'); return; }
+      const id = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const btn = document.getElementById('catSaveBtn');
+      btn.disabled = true; btn.textContent = 'Guardando…';
+      try {
+        const { error } = await sb.from('categories').insert({ id, name, color, icon });
+        if (error) throw error;
+        CATS[id] = { l: name, c: color, icon };
+        FORM.category = id;
+        closeModal();
+        TAB = 'agregar';
+        render();
+        toast('Categoría agregada ✓');
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Agregar';
+        toast('Error: ' + err.message);
+      }
+    }
 
+    async function procesarComprobante(input) {
+      try {
+        const archivo = input.files[0];
+        if (!archivo) { return; }
+
+        closeModal();
+        TAB = 'pendientes';
+        document.getElementById('contentSlot').innerHTML = `
+    <div class="loader">
+      <div class="spinner"></div>
+      Analizando comprobante...
+    </div>`;
+
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = () => reject(new Error('Error leyendo archivo'));
+          reader.readAsDataURL(archivo);
+        });
+
+        const esPDF = archivo.type === 'application/pdf';
+        const mediaType = esPDF ? 'application/pdf' : archivo.type;
+
+        const response = await fetch(
+          'https://mpwnrcuvenrmzihekbio.supabase.co/functions/v1/parsear-comprobante',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagen: base64, tipo: mediaType })
+          }
+        )
+
+        const data = await response.json();
+        const texto = data.texto ?? '';
+
+        let campos = {};
+        try { campos = JSON.parse(texto); }
+        catch { campos = {}; }
+
+        const borrador = {
+          id: uid(),
+          description: campos.emisor || campos.descripcion || '',
+          category: 'extras',
+          person: 'FAMILIAR',
+          payer: 'MATI',
+          amount: campos.monto || 0,
+          paymentMethod: 'Crédito',
+          monthDevengado: campos.fecha
+            ? campos.fecha.slice(0, 7)
+            : MON,
+          fixed: false,
+          notes: campos.descripcion || '',
+          status: 'borrador'
+        };
+
+        await saveExpense(borrador);
+        EXP = [...EXP, borrador];
+        render();
+        toast('Comprobante capturado — revisá en Pendientes');
+      } catch (err) {
+        toast('Error al procesar: ' + err.message);
+        render();
+      }
+    }
+
+    function showCapturaModal() {
+      document.getElementById('modalBox').innerHTML = `
+<div style="font-size:15px;font-weight:600;margin-bottom:4px">Capturar comprobante</div>
+<div style="font-size:12px;color:var(--text2);margin-bottom:20px">
+  Seleccioná el tipo de comprobante a capturar
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+  <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer">
+    <input type="file" id="capturaInput" accept="image/*,application/pdf" style="display:none" onchange="procesarComprobante(this)">
+    <span style="font-size:22px">📷</span>
+    <div>
+      <div style="font-size:13px;font-weight:500">Foto o imagen</div>
+      <div style="font-size:11px;color:var(--text2)">Ticket, recibo, captura de pantalla</div>
+    </div>
+  </label>
+  <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer">
+    <input type="file" id="capturaInputPDF" accept="application/pdf" style="display:none" onchange="procesarComprobante(this)">
+    <span style="font-size:22px">📄</span>
+    <div>
+      <div style="font-size:13px;font-weight:500">Documento PDF</div>
+      <div style="font-size:11px;color:var(--text2)">Comprobante electrónico, factura</div>
+    </div>
+  </label>
+</div>
+<button class="btn-s" onclick="closeModal()">Cancelar</button>`;
+      document.getElementById('overlay').classList.add('open');
+    }
 
     /* ===================== MODAL INGRESOS ===================== */
     function showIncModal() {
