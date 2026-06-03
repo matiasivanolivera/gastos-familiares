@@ -797,7 +797,7 @@
         CATS = Object.fromEntries((catRes.data || []).map(r => [r.id, { l: r.name, c: r.color, icon: r.icon }]));
         // Set MON to latest month with data, or current month
         const months = allM();
-        if (months.length > 0 && !months.includes(MON)) MON = months[months.length - 1];
+        if (months.length > 0) MON = months[months.length - 1];
         render();
       } catch (err) {
         showError('Error al conectar con la base de datos: ' + err.message);
@@ -851,9 +851,10 @@
 
     /* ===================== NAVIGATION ===================== */
     function navM(d) {
-      const ms = allM(); const idx = ms.indexOf(MON);
-      const ni = idx + d;
-      if (ni >= 0 && ni < ms.length) { MON = ms[ni]; render(); }
+      const [y, m] = MON.split('-').map(Number);
+      const date = new Date(y, m - 1 + d);
+      MON = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      render();
     }
     function setTab(t) {
       TAB = t;
@@ -863,10 +864,10 @@
 
     /* ===================== RENDER ===================== */
     function render() {
-      const months = allM(); const idx = months.indexOf(MON);
+      const months = allM();
       document.getElementById('mLabel').textContent = fmtM(MON);
-      document.getElementById('prevBtn').disabled = idx <= 0;
-      document.getElementById('nextBtn').disabled = idx >= months.length - 1 || (months.length === 0);
+      document.getElementById('prevBtn').disabled = MON <= (months[0] || MON);
+      document.getElementById('nextBtn').disabled = MON >= curM();
 
       const tbls = [{ id: 'dash', l: 'Resumen' }, { id: 'gastos', l: 'Gastos' }, { id: 'pendientes', l: '⏳ Pendientes' }, { id: 'agregar', l: '+ Agregar' }, { id: 'analisis', l: 'Análisis' }];
       document.getElementById('tabsSlot').innerHTML = tbls.map(t =>
