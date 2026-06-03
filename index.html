@@ -751,7 +751,7 @@
       const deferredNames = PMTHS.filter(p => p.deferred).map(p => p.name);
       return mExp().filter(e => !deferredNames.includes(e.paymentMethod)).reduce((s, e) => s + e.amount, 0);
     }
-    function allM() { return [...new Set(EXP.map(e => e.monthDevengado))].sort(); }
+    function allM() { return [...new Set([EXP.map(e => e.monthDevengado), MON])].sort(); }
 
     /* ===================== DB MAPPERS ===================== */
     function rowToExp(r) {
