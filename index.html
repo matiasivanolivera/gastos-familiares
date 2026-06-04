@@ -751,7 +751,7 @@
       const deferredNames = PMTHS.filter(p => p.deferred).map(p => p.name);
       return mExp().filter(e => !deferredNames.includes(e.paymentMethod)).reduce((s, e) => s + e.amount, 0);
     }
-    function allM() { return [...new Set([EXP.map(e => e.monthDevengado), MON])].sort(); }
+    function allM() { return [...new Set(EXP.map(e => e.monthDevengado))].sort(); }
 
     /* ===================== DB MAPPERS ===================== */
     function rowToExp(r) {
@@ -882,7 +882,9 @@
 
     /* ===================== DASH ===================== */
     function rDash() {
-      const exps = mExp(), tot = sumAmt(exps), inc = mInc(), pct = inc > 0 ? Math.round(tot / inc * 100) : 0, disp = inc - tot;
+      const exps = mExp(), tot = sumAmt(exps), inc = mInc();
+      const real = mReal();
+      const pct = inc > 0 ? Math.round(real / inc * 100) : 0, disp = inc - real;
       const months = allM(), idx = months.indexOf(MON);
       const prev = idx > 0 ? sumAmt(EXP.filter(e => e.monthDevengado === months[idx - 1])) : null;
       const diff = prev !== null ? tot - prev : null;
